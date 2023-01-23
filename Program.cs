@@ -6,25 +6,27 @@ class Myclass
     {
         Data_Migration.DbConnect();
         Data_Migration.AddMillionRecord();
-        Thread thread1 = new Thread(Data_Migration.Migration);
-        thread1.Start();
-        while(true)
-        {
-            Thread.Sleep(1000);
-            if(Console.KeyAvailable)
-            {
-                string action = Console.ReadLine();
-                if (action.ToLower() == "cancel")
-                {
-                    Console.WriteLine("Migration cancelled");
-                }
-            }
+        Thread migration = new Thread(Data_Migration.Migration);
+        migration.Start();
+        Thread interrupt = new Thread(Data_Migration.Interupt);
+        interrupt.Start();
+        //while(true)
+        //{
+        //    Thread.Sleep(1000);
+        //    if(Console.KeyAvailable)
+        //    {
+        //        string action = Console.ReadLine();
+        //        if (action.ToLower() == "cancel")
+        //        {
+        //            Console.WriteLine("Migration cancelled");
+        //        }
+        //    }
                 
             
-        }
+        //}
 
-        thread1.Join();
-
+        migration.Join();
+        interrupt.Join();
         //Data_Migration.Migration();
         //ThreadStart s1 = Data_Migration.Migration;
         //ThreadStart s2 = Listener.listen;

@@ -1,6 +1,6 @@
 ﻿using System.Data;
 using System.Data.SqlClient;
-
+using System.Security.Cryptography;
 
 namespace Data_Migration_Utility
 {
@@ -8,6 +8,13 @@ namespace Data_Migration_Utility
     {
         static string connectionString;
         static SqlConnection cnn;
+        static AutoResetEvent signal=new AutoResetEvent(false);
+        volatile static bool interruptFlag;
+        static bool cancelFlag;
+        static int start;
+        static int end;
+        static int current;
+
         public static void DbConnect()
         {
             
@@ -89,9 +96,19 @@ namespace Data_Migration_Utility
                 {
                     Console.WriteLine("Please enter a range to migrate a batch.");
                     Console.Write("start number = ");
-                    int start = int.Parse(Console.ReadLine());
-                    Console.Write("end number = ");
-                    int end = int.Parse(Console.ReadLine());
+                    try
+                    {
+                        start = int.Parse(Console.ReadLine());
+                        Console.Write("end number = ");
+                        end = int.Parse(Console.ReadLine());
+                    }
+                    catch(Exception e)
+                    {
+                        //Console.WriteLine(e.ToString());
+                        Console.WriteLine("Please enter range correctly");
+                        continue;
+                    }
+                    
                     if (start > end)
                     {
                         Console.WriteLine("Please enter a range correctly");
@@ -120,23 +137,26 @@ namespace Data_Migration_Utility
 
                     for (int i = start; i <= end; i++)
                     {
-                      
+                        current = i;
                         DataRow row = destTable.NewRow();
                         reader.Read();
                         row["Id"] = reader.GetInt32(0);
                         row["sum"] = Sum((double)reader.GetSqlSingle(1), (double)reader.GetSqlSingle(2));
                         destTable.Rows.Add(row);
+                        if(interruptFlag)
+                        {
+                            if(signal.WaitOne())
+                            {
+
+                            }
+                            if(cancelFlag)
+                            {
+                            break;
+                            }
+                        }
                         if (i == end || ((start - i) % 100 == 0 && i != start))
                         {
-                            //if(Console.KeyAvailable)
-                            //{
-                            //    string action=Console.ReadLine();
-                            //    if(action.ToLower()=="cancel")
-                            //    {
-                            //        break;
-                            //    }
-                            //}
-                        Console.WriteLine($"Start={start}- i={i} - End={end}");
+                            //Console.WriteLine($"Start={start}- i={i} - End={end}");
                             WriteInDestinationTable(destTable);
 
                             destTable.Clear();
@@ -159,18 +179,45 @@ namespace Data_Migration_Utility
             {
                 copy.WriteToServer(destTable);
                 copy.Close();
-                Console.WriteLine("Successfully migrate data to DestinationTable");
+                Console.WriteLine("another 100 records Successfully migrate data to DestinationTable");
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Could not write data to DestinationTable");
-                Console.WriteLine(ex.Message);
+                Console.WriteLine("Please enter a range which do not overlap previous migration");
+                //Console.WriteLine(ex.Message);
             }
             finally
             {
                 destCnn.Close();
             }
         }
-        
+        public static void Interupt()
+        {
+            while (true)
+            {
+                if (Console.KeyAvailable)
+                {
+                    interruptFlag= true;
+                    string action = Console.ReadLine();
+                    if (action.ToLower() == "cancel")
+                    {
+                        Console.WriteLine("Migration cancelled");
+                        Console.WriteLine($"{start} to {current - 1} were completed");
+
+                        cancelFlag = true;
+                        
+                    }
+                    if(action.ToLower()=="status")
+                    {
+                        Console.WriteLine("Migration status:");
+                        Console.WriteLine($"{start} to {current - 1} are completed");
+                        Console.WriteLine($"{current} to {end} are remianing");
+                    }
+                    interruptFlag= false;
+                    signal.Set();
+                }
+            }
+        }
     }
 }
