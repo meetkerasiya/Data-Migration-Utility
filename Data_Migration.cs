@@ -11,10 +11,11 @@ namespace Data_Migration_Utility
         static AutoResetEvent signal=new AutoResetEvent(false);
         volatile static bool interruptFlag;
         static bool cancelFlag;
+        static bool overlapFlag;
         static int start;
         static int end;
         static int current;
-
+        static int count = 0;
         public static void DbConnect()
         {
             
@@ -27,7 +28,7 @@ namespace Data_Migration_Utility
                 Console.WriteLine("Conncetion established");
                 
                 //To clear all records from table which where previously stored
-                SqlCommand command = new SqlCommand("DELETE FROM DestinationTable Where Id>=0", cnn);
+                SqlCommand command = new SqlCommand("DELETE FROM DestinationTable", cnn);
                 command.ExecuteNonQuery();
                 command = new SqlCommand("DELETE FROM SourceTable", cnn);
                 command.ExecuteNonQuery();
@@ -46,7 +47,7 @@ namespace Data_Migration_Utility
             
             DataTable sourceTable = new DataTable();
             sourceTable.Columns.Add(new DataColumn("Id", typeof(Int32)));
-            sourceTable.Columns.Add(new DataColumn("FirstNumber",typeof(Double)));
+            sourceTable.Columns.Add(new DataColumn("FirstNumber", typeof(Int32)));
             sourceTable.Columns.Add(new DataColumn("SecondNumber",typeof(Double)));
             Random random=new Random();
 
@@ -90,8 +91,7 @@ namespace Data_Migration_Utility
         
         public static void Migration()
         {
-            //lock (Data_Migration.listen)
-            //{
+            
                 while (true)
                 {
                     Console.WriteLine("Please enter a range to migrate a batch.");
@@ -101,15 +101,15 @@ namespace Data_Migration_Utility
                         start = int.Parse(Console.ReadLine());
                         Console.Write("end number = ");
                         end = int.Parse(Console.ReadLine());
+                    count = 0;
                     }
                     catch(Exception e)
                     {
-                        //Console.WriteLine(e.ToString());
                         Console.WriteLine("Please enter range correctly");
                         continue;
                     }
                     
-                    if (start > end)
+                    if (start > end || start<0 || end<1 || start>=1000000 || end>=1000000)
                     {
                         Console.WriteLine("Please enter a range correctly");
                         continue;
@@ -121,19 +121,11 @@ namespace Data_Migration_Utility
                     //data reader to show table 
                     SqlDataReader reader = dataInRange.ExecuteReader();
 
-                    /*
-                    while(reader.Read())
-                    {
-                        Console.Write(reader.GetInt32(0)+" ");
-                        Console.Write(reader.GetSqlSingle(1)+" ");
-                        Console.Write(reader.GetSqlSingle(2)+"\n");
-                    }
-                    */
+                  
                     DataTable destTable = new DataTable();
                     destTable.Columns.Add("Id", typeof(int));
                     destTable.Columns.Add("Sum", typeof(double));
 
-                   // Monitor.Wait(Data_Migration.listen, 1);
 
                     for (int i = start; i <= end; i++)
                     {
@@ -143,6 +135,10 @@ namespace Data_Migration_Utility
                         row["Id"] = reader.GetInt32(0);
                         row["sum"] = Sum((double)reader.GetSqlSingle(1), (double)reader.GetSqlSingle(2));
                         destTable.Rows.Add(row);
+                        if(overlapFlag)
+                        {
+                            break;
+                        }
                         if(interruptFlag)
                         {
                             if(signal.WaitOne())
@@ -151,21 +147,27 @@ namespace Data_Migration_Utility
                             }
                             if(cancelFlag)
                             {
-                            break;
+                            //if we don't change than when in future we ask for status it will stop program
+                                cancelFlag= false;
+                                break;
                             }
                         }
                         if (i == end || ((start - i) % 100 == 0 && i != start))
                         {
-                            //Console.WriteLine($"Start={start}- i={i} - End={end}");
-                            WriteInDestinationTable(destTable);
-
+                        count += 100;
+                        WriteInDestinationTable(destTable);
+                        
+                            
                             destTable.Clear();
                         }
                     }
-
-                    cnn.Close();
+                    if(current== end && !overlapFlag)
+                    {
+                        Console.WriteLine("Data Migration completed successfully!!");
+                    }
+                overlapFlag = false;
+                cnn.Close();
                 }
-            //}
         }
         public static void WriteInDestinationTable(DataTable destTable)
         {
@@ -179,13 +181,13 @@ namespace Data_Migration_Utility
             {
                 copy.WriteToServer(destTable);
                 copy.Close();
-                Console.WriteLine("another 100 records Successfully migrate data to DestinationTable");
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Could not write data to DestinationTable");
                 Console.WriteLine("Please enter a range which do not overlap previous migration");
-                //Console.WriteLine(ex.Message);
+                overlapFlag = true;
+                
             }
             finally
             {
@@ -203,7 +205,7 @@ namespace Data_Migration_Utility
                     if (action.ToLower() == "cancel")
                     {
                         Console.WriteLine("Migration cancelled");
-                        Console.WriteLine($"{start} to {current - 1} were completed");
+                        Console.WriteLine($"{start} to {start+count} were completed");
 
                         cancelFlag = true;
                         
@@ -211,8 +213,9 @@ namespace Data_Migration_Utility
                     if(action.ToLower()=="status")
                     {
                         Console.WriteLine("Migration status:");
-                        Console.WriteLine($"{start} to {current - 1} are completed");
-                        Console.WriteLine($"{current} to {end} are remianing");
+                        Console.WriteLine($"{start} to {start+count} are completed");
+                        Console.WriteLine($"Ongoing: {start + count + 1} to {current} ");
+                        Console.WriteLine($"{current+1} to {end} are remianing");
                     }
                     interruptFlag= false;
                     signal.Set();
