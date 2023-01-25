@@ -185,8 +185,13 @@ namespace Data_Migration_Utility
             catch (Exception ex)
             {
                 Console.WriteLine("Could not write data to DestinationTable");
-                Console.WriteLine("Please enter a range which do not overlap previous migration");
-                overlapFlag = true;
+                if(ex.Message.Contains("The duplicate key value is"))
+                {
+                    Console.WriteLine("Please enter a range which do not overlap previous migration");
+                    overlapFlag = true;
+                }
+                
+
                 
             }
             finally
