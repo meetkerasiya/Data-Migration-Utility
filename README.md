@@ -15,16 +15,23 @@ and pass it to SqlConnection constructor
 sqlConnection.open();
 
 ->we can use sql queries using 
-SqlCommand command=new SqlCommand("query",sqlConnection);
+
+	SqlCommand command=new SqlCommand("query",sqlConnection);
+
 ->and execute using
-command.ExecuteNonQuery()
+
+	command.ExecuteNonQuery()
+	
 ->but to read data from DB
-SqlDataReader reader=command.ExecuteReader()
+
+	SqlDataReader reader=command.ExecuteReader()
+	
 ->To get these outputs
 reader.Read(); //advances one record
 for int reader.GetInt32(0); // 0 if column index like 0-> first , 1-> second
 if does not work for any perticular type then try
-reader.GEtSqlSingle(1);
+
+	reader.GetSqlSingle(1);
 
 Note:
 We can't add data while using reader
@@ -34,12 +41,14 @@ or we can use different connection object to achieve that
 -----------------------------------------------------
 =>To add data in database 
 ->we use class named DataTable
+
             DataTable sourceTable = new DataTable();
             sourceTable.Columns.Add(new DataColumn("Id", typeof(Int32)));
             sourceTable.Columns.Add(new DataColumn("Id", typeof(Int32)));
 this is how we set dataTable
 then to add rows
-DataRow row = sourceTable.NewRow();
+
+		DataRow row = sourceTable.NewRow();
                 row["Id"] = i;
                 row["FirstNumber"] =num;
                 sourceTable.Rows.Add(row);
@@ -49,7 +58,7 @@ DataRow row = sourceTable.NewRow();
 it is easier and faster to use a Transact-SQL INSERT ... SELECT statement to copy the data.
 -> Also use SqlBulkCopy for large amount of data not for few rows or row by row data insertion
 
-SqlBulkCopy objBulk = new SqlBulkCopy(cnn);
+	    SqlBulkCopy objBulk = new SqlBulkCopy(cnn);
             objBulk.DestinationTableName = "SourceTable";
             objBulk.ColumnMappings.Add("Id", "Id");
             objBulk.ColumnMappings.Add("FirstNumber", "FirstNumber");
@@ -67,7 +76,7 @@ There is one thread called "Main thread" which always runs in program
 while doing migration task
 so i used
 
-Thread migration = new Thread(Data_Migration.Migration);
+	Thread migration = new Thread(Data_Migration.Migration);
         migration.Start();
         Thread interrupt = new Thread(Data_Migration.Interupt);
         interrupt.Start();
